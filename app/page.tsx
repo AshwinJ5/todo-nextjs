@@ -79,7 +79,7 @@ export default function Home() {
                                     <path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="currentColor"></path>
                                 </svg>
                             </div>
-                            <h2 className="text-slate-900 dark:text-white text-2xl font-bold">Clarity</h2>
+                            <h2 className="text-slate-900 dark:text-white text-2xl font-bold">Taskly</h2>
                         </Link>
 
                         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -107,7 +107,7 @@ export default function Home() {
                 <section className="py-20 sm:py-28">
                     <div className="container mx-auto px-6 text-center">
                         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tighter text-slate-900 dark:text-white leading-tight">
-                            Achieve focus. Find your <span className="text-blue-600">Clarity</span>.
+                            Achieve focus. Find your <span className="text-blue-600">Taskly</span>.
                         </h1>
                         <p className="mt-6 max-w-2xl mx-auto text-lg text-slate-500 dark:text-slate-400">
                             The simple yet powerful to-do list that helps you organize your work and life. Stop feeling
@@ -128,7 +128,7 @@ export default function Home() {
                                         "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCOstMgyAdd1V8CzH5RPWXdcTKA-DcSKPPKYTQQwTgt7gJCFHGOQKg4B2VXdN9ev-Ulzg1SMHsUrlfBQfX3bQg8RGymQqbtyR9yEJ9Ydwd7L-Z4VuO3TmXZtnN0q0phYvE25S3Tnv_yYA96SSbBdHGFuE8-CPmMVlK53PGAZcSeE13p99YlV_93zwIciqhr9KOcW1wFPLeFA3wICinEQgXKfA5h_AqXisS1NO4I8LfTOy9SJxYdWRPnmF3f-Sy6YvyH4b2IxIWD5DI')",
                                 }}
                                 role="img"
-                                aria-label="Screenshot of the Clarity to-do app interface"
+                                aria-label="Screenshot of the Taskly to-do app interface"
                             ></div>
                         </div>
                     </div>
@@ -141,7 +141,7 @@ export default function Home() {
                                 Everything you need to get organized
                             </h2>
                             <p className="mt-4 text-lg text-slate-500 dark:text-slate-400">
-                                Clarity is packed with features designed to improve your productivity and bring peace of
+                                Taskly is packed with features designed to improve your productivity and bring peace of
                                 mind.
                             </p>
                         </div>
@@ -173,7 +173,7 @@ export default function Home() {
                             </h2>
                             <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-400 dark:text-slate-300">
                                 Join thousands of users who are organizing their lives and achieving their goals with
-                                Clarity.
+                                Taskly.
                             </p>
                             <div className="mt-8">
                                 <button className="flex w-auto mx-auto cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-8 bg-blue-600 text-white text-base font-bold leading-normal hover:bg-blue-700 transition-colors">
@@ -189,7 +189,7 @@ export default function Home() {
                 <div className="container mx-auto px-6">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            © 2024 Clarity Inc. All rights reserved.
+                            © 2024 Taskly Inc. All rights reserved.
                         </p>
                         <div className="flex items-center gap-6">
                             <Link

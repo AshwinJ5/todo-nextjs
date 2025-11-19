@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clarity Todo App",
+  title: "Taskly Todo App",
   description: "Todo App using Next.js and NestJS",
   icons: {
     icon: "/logo.png", 

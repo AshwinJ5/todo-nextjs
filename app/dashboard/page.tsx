@@ -140,7 +140,7 @@ export default function TaskDashboard() {
                                     <path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="currentColor"></path>
                                 </svg>
                             </div>
-                            <h2 className="text-slate-900 dark:text-white text-2xl font-bold">Clarity</h2>
+                            <h2 className="text-slate-900 dark:text-white text-2xl font-bold">Taskly</h2>
                         </Link>
                     </div>
 
@@ -209,7 +209,7 @@ export default function TaskDashboard() {
                 <main className="px-4 sm:px-10 flex flex-1 justify-center py-5">
                     <div className="flex flex-col w-full max-w-5xl flex-1">
                         <div className="flex flex-wrap justify-between gap-3 p-4 items-center">
-                            <p className="text-gray-800 dark:text-white text-4xl font-black leading-tight tracking-[-0.033em] min-w-72">
+                            <p className="text-gray-800 dark:text-white text-2xl sm:text-4xl font-black leading-tight tracking-[-0.033em] min-w-72">
                                 My Tasks
                             </p>
                         </div>
@@ -243,7 +243,6 @@ export default function TaskDashboard() {
                                     <select className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg py-2 pl-3 pr-8 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 focus:border-[#137fec]/50">
                                         <option>Due Date</option>
                                         <option>Creation Date</option>
-                                        <option>Priority</option>
                                     </select>
                                     <svg
                                         className="w-5 h-5 text-gray-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
