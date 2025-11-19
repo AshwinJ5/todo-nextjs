@@ -1,17 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-interface TaskData {
-    description: string;
-    dueDate: string;
-    isCompleted: boolean;
-}
+import { todoService } from "@/app/services/todoService";
 
 interface AddTaskModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAddTask: (data: TaskData) => void;
+    onAddTask: (newTask: unknown) => void;
 }
 
 export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
@@ -19,13 +14,16 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModa
     const [dueDate, setDueDate] = useState("");
     const [isCompleted, setIsCompleted] = useState(false);
 
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState("");
+
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape" && !isLoading) onClose();
         };
         if (isOpen) window.addEventListener("keydown", handleEsc);
         return () => window.removeEventListener("keydown", handleEsc);
-    }, [isOpen, onClose]);
+    }, [isOpen, onClose, isLoading]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -33,13 +31,30 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModa
             setDescription("");
             setDueDate("");
             setIsCompleted(false);
+            setError("");
+            setIsLoading(false);
         }, 0);
         return () => clearTimeout(t);
     }, [isOpen]);
 
-    const handleSubmit = () => {
-        onAddTask({ description, dueDate, isCompleted });
-        onClose();
+    const handleSubmit = async () => {
+        if (!description.trim()) return;
+
+        setIsLoading(true);
+        setError("");
+
+        try {
+            const createdTask = await todoService.createTodo(description, dueDate);
+
+            onAddTask(createdTask);
+
+            onClose();
+        } catch (err) {
+            console.error(err);
+            setError("Failed to create task. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -47,14 +62,15 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModa
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity p-4 font-sans"
-            onClick={(e) => e.target === e.currentTarget && onClose()}
+            onClick={(e) => e.target === e.currentTarget && !isLoading && onClose()}
         >
             <div className="flex w-full max-w-lg flex-col rounded-xl bg-white dark:bg-zinc-900 shadow-2xl ring-1 ring-gray-200 dark:ring-zinc-800 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between gap-2 p-6 border-b border-slate-200 dark:border-zinc-800 items-center">
                     <p className="text-slate-900 dark:text-white text-xl font-bold leading-tight">Add New Task</p>
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 focus:outline-none"
+                        disabled={isLoading}
+                        className="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 focus:outline-none disabled:opacity-50"
                         type="button"
                         aria-label="Close modal"
                     >
@@ -72,28 +88,36 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModa
                 </div>
 
                 <div className="flex flex-col gap-6 p-6">
+                    {error && (
+                        <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                            {error}
+                        </div>
+                    )}
+
                     <label className="flex flex-col w-full">
                         <span className="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal pb-2">
-                            Task
+                            Task <span className="text-red-500">*</span>
                         </span>
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 focus:border-[#137fec] border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 min-h-32 placeholder:text-slate-400 dark:placeholder:text-zinc-500 p-4 text-base font-normal leading-normal"
+                            disabled={isLoading}
+                            className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 focus:border-[#137fec] border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 min-h-32 placeholder:text-slate-400 dark:placeholder:text-zinc-500 p-4 text-base font-normal leading-normal disabled:opacity-50"
                             placeholder="e.g., Finish design mockups"
                         />
                     </label>
 
                     <label className="flex flex-col w-full">
                         <span className="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal pb-2">
-                            Due Date
+                            Due Date <span className="text-red-500">*</span>
                         </span>
                         <div className="flex w-full flex-1 items-stretch rounded-lg group">
                             <input
                                 type="date"
                                 value={dueDate}
                                 onChange={(e) => setDueDate(e.target.value)}
-                                className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-l-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 focus:border-[#137fec] border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 h-12 placeholder:text-slate-400 dark:placeholder:text-zinc-500 p-4 border-r-0 pr-2 text-base font-normal leading-normal appearance-none"
+                                disabled={isLoading}
+                                className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-l-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 focus:border-[#137fec] border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 h-12 placeholder:text-slate-400 dark:placeholder:text-zinc-500 p-4 border-r-0 pr-2 text-base font-normal leading-normal appearance-none disabled:opacity-50"
                             />
                             <div className="text-slate-500 dark:text-zinc-400 flex border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 items-center justify-center pr-4 rounded-r-lg border-l-0 pointer-events-none">
                                 <svg
@@ -121,7 +145,8 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModa
                                     type="checkbox"
                                     checked={isCompleted}
                                     onChange={(e) => setIsCompleted(e.target.checked)}
-                                    className="peer h-5 w-5 cursor-pointer appearance-none rounded border-2 border-slate-300 dark:border-zinc-600 bg-transparent checked:bg-[#137fec] checked:border-[#137fec] focus:ring-2 focus:ring-offset-2 focus:ring-[#137fec] focus:ring-offset-white dark:focus:ring-offset-zinc-900 transition-all"
+                                    disabled={isLoading}
+                                    className="peer h-5 w-5 cursor-pointer appearance-none rounded border-2 border-slate-300 dark:border-zinc-600 bg-transparent checked:bg-[#137fec] checked:border-[#137fec] focus:ring-2 focus:ring-offset-2 focus:ring-[#137fec] focus:ring-offset-white dark:focus:ring-offset-zinc-900 transition-all disabled:opacity-50"
                                 />
                                 <svg
                                     className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none hidden peer-checked:block text-white"
@@ -136,7 +161,7 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModa
                                     <polyline points="20 6 9 17 4 12"></polyline>
                                 </svg>
                             </div>
-                            <p className="text-slate-700 dark:text-slate-300 text-base font-medium leading-normal select-none">
+                            <p className="text-slate-700 dark:text-slate-300 text-base font-medium leading-normal select-none opacity-100 peer-disabled:opacity-50">
                                 Mark as Completed
                             </p>
                         </label>
@@ -146,14 +171,38 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModa
                 <div className="flex flex-col sm:flex-row-reverse justify-start gap-3 p-6 border-t border-slate-200 dark:border-zinc-800">
                     <button
                         onClick={handleSubmit}
-                        disabled={!description.trim()}
-                        className="flex items-center justify-center rounded-lg bg-[#137fec] px-5 py-2.5 text-center text-sm font-medium text-white shadow-sm transition-all hover:bg-[#137fec]/90 focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!description.trim() || isLoading}
+                        className="flex items-center justify-center rounded-lg bg-[#137fec] px-5 py-2.5 text-center text-sm font-medium text-white shadow-sm transition-all hover:bg-[#137fec]/90 focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px]"
                     >
-                        Add Task
+                        {isLoading ? (
+                            <svg
+                                className="animate-spin h-5 w-5 text-white"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                            >
+                                <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                ></circle>
+                                <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                            </svg>
+                        ) : (
+                            "Add Task"
+                        )}
                     </button>
                     <button
                         onClick={onClose}
-                        className="flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 px-5 py-2.5 text-center text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-all hover:bg-gray-200 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-zinc-600 border border-transparent"
+                        disabled={isLoading}
+                        className="flex items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800 px-5 py-2.5 text-center text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-all hover:bg-gray-200 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-zinc-600 border border-transparent disabled:opacity-50"
                     >
                         Cancel
                     </button>

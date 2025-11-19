@@ -1,13 +1,9 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
-
-interface SignUpFormData {
-    email: string;
-    username: string;
-    name: string;
-    password: string;
-}
+import { authService } from "@/app/services/authservices";
+import { SignUpFormData } from "@/app/types/auth";
+import { useRouter } from "next/navigation";
 
 type StrengthColor = "red" | "yellow" | "green";
 
@@ -24,12 +20,15 @@ const strengthColors: Record<StrengthColor, string> = {
 };
 
 const SignUp = () => {
+    const router = useRouter();
+
     const [formData, setFormData] = useState<SignUpFormData>({
         email: "",
         username: "",
         name: "",
         password: "",
     });
+    console.log(formData);
 
     const [emailError, setEmailError] = useState<string>("");
     const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -38,6 +37,10 @@ const SignUp = () => {
         text: "",
         color: "red",
     });
+
+    const [loading, setLoading] = useState<boolean>(false);
+    const [apiError, setApiError] = useState<string>("");
+    const [successMessage, setSuccessMessage] = useState<string>("");
 
     const calculatePasswordStrength = (password: string): void => {
         let strength = 0;
@@ -58,26 +61,47 @@ const SignUp = () => {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-
         setFormData((prev) => ({ ...prev, [name as keyof SignUpFormData]: value }));
+        setApiError("");
+        setSuccessMessage("");
 
-        if (name === "password") {
-            calculatePasswordStrength(value);
-        }
-        if (name === "email") {
-            setEmailError("");
-        }
+        if (name === "password") calculatePasswordStrength(value);
+        if (name === "email") setEmailError("");
     };
 
-    const handleSubmit = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
 
-        if (formData.email === "test@example.com") {
-            setEmailError("Email is already in use.");
+        if (!formData.email || !formData.username || !formData.password) {
+            setApiError("Please fill in all required fields.");
             return;
         }
 
-        console.log("Form submitted:", formData);
+        setLoading(true);
+        setApiError("");
+        setSuccessMessage("");
+        setEmailError("");
+
+        try {
+            await authService.signUp(formData);
+
+            setSuccessMessage("Account created successfully! Redirecting...");
+
+            setTimeout(() => {
+                router.push("/login");
+            }, 2000);
+        } catch (error: unknown) {
+            console.error("Submission Error:", error);
+            if (error instanceof Error) {
+                setApiError(error.message || "Login failed. Please try again.");
+            } else if (typeof error === "string") {
+                setApiError(error || "Login failed. Please try again.");
+            } else {
+                setApiError("Login failed. Please try again.");
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

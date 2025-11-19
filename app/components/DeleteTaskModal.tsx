@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { todoService } from "../services/todoService";
 
 interface DeleteConfirmationModalProps {
     isOpen: boolean;
+    taskId: string | null;
     onClose: () => void;
     onConfirm: () => void;
     title?: string;
@@ -12,26 +14,60 @@ interface DeleteConfirmationModalProps {
 
 export default function DeleteConfirmationModal({
     isOpen,
+    taskId,
     onClose,
     onConfirm,
     title = "Confirm Deletion",
     description = "Are you sure you want to permanently delete this task? This action cannot be undone.",
 }: DeleteConfirmationModalProps) {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState("");
+
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape" && !isLoading) onClose();
         };
         if (isOpen) window.addEventListener("keydown", handleEsc);
         return () => window.removeEventListener("keydown", handleEsc);
-    }, [isOpen, onClose]);
+    }, [isOpen, onClose, isLoading]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const timeoutId = window.setTimeout(() => {
+            setError("");
+            setIsLoading(false);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [isOpen]);
 
     if (!isOpen) return null;
+
+    const handleDelete = async () => {
+        if (!taskId) return;
+
+        setIsLoading(true);
+        setError("");
+
+        try {
+            await todoService.deleteTodo(taskId);
+
+            onConfirm();
+        } catch (err) {
+            console.error(err);
+            setError("Failed to delete task. Please try again.");
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center font-sans p-4">
             <div
                 className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-                onClick={onClose}
+                onClick={() => !isLoading && onClose()}
                 aria-hidden="true"
             />
 
@@ -68,22 +104,53 @@ export default function DeleteConfirmationModal({
                         {title}
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 text-base font-normal leading-normal">{description}</p>
+
+                    {error && (
+                        <p className="text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded text-sm mt-2 border border-red-100 dark:border-red-800">
+                            {error}
+                        </p>
+                    )}
                 </div>
 
                 <div className="flex w-full flex-col-reverse sm:flex-row gap-3 pt-2">
                     <button
                         onClick={onClose}
-                        className="flex h-10 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#f0f2f4] dark:bg-zinc-700 text-[#111418] dark:text-gray-200 text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        disabled={isLoading}
+                        className="flex h-10 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#f0f2f4] dark:bg-zinc-700 text-[#111418] dark:text-gray-200 text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         type="button"
                     >
                         <span className="truncate">Cancel</span>
                     </button>
                     <button
-                        onClick={onConfirm}
-                        className="flex h-10 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#E53935] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-800"
+                        onClick={handleDelete}
+                        disabled={isLoading}
+                        className="flex h-10 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#E53935] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
                         type="button"
                     >
-                        <span className="truncate">Delete</span>
+                        {isLoading ? (
+                            <svg
+                                className="animate-spin h-5 w-5 text-white"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                            >
+                                <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                ></circle>
+                                <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                            </svg>
+                        ) : (
+                            <span className="truncate">Delete</span>
+                        )}
                     </button>
                 </div>
             </div>

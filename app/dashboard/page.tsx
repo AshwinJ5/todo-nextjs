@@ -1,114 +1,165 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import EditTaskModal, { TaskData } from "../components/EditTaskModal";
 import AddTaskModal from "../components/AddtaskModal";
 import DeleteConfirmationModal from "../components/DeleteTaskModal";
+import { todoService } from "@/app/services/todoService";
+import { Task, TodoApiResponse } from "@/app/types/todo";
+import TaskSkeleton from "../components/TaskSkeleton";
 
-interface Task {
-    id: number;
-    title: string;
-    isCompleted: boolean;
-    dueDate: string;
-    addedDate: string;
-    priorityColor: string;
+// --- UTILS ---
+
+// Hook to delay API calls while typing
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+    return debouncedValue;
 }
 
-type FilterType = "All" | "Active" | "Completed";
+const formatDate = (isoString: string) => {
+    if (!isoString) return "No Date";
+    return new Date(isoString).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
 
-const INITIAL_TASKS: Task[] = [
-    {
-        id: 1,
-        title: "Finalize the Q4 report presentation",
-        isCompleted: true,
-        dueDate: "2024-10-26",
-        addedDate: "Oct 20",
-        priorityColor: "bg-green-500",
-    },
-    {
-        id: 2,
-        title: "Schedule a team sync for the new project kickoff",
-        isCompleted: false,
-        dueDate: "2024-10-28",
-        addedDate: "Oct 22",
-        priorityColor: "bg-orange-500",
-    },
-    {
-        id: 3,
-        title: "Buy groceries for the week",
-        isCompleted: false,
-        dueDate: "2024-10-24",
-        addedDate: "Oct 24",
-        priorityColor: "bg-red-500",
-    },
-    {
-        id: 4,
-        title: "Renew gym membership",
-        isCompleted: false,
-        dueDate: "2024-11-05",
-        addedDate: "Oct 24",
-        priorityColor: "bg-blue-500",
-    },
-];
+const getPriorityColor = (dateString: string): string => {
+    const targetDate = new Date(dateString);
+    const today = new Date();
+    targetDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return "bg-red-500";
+    else if (diffDays === 0) return "bg-red-600";
+    else if (diffDays === 1) return "bg-orange-500";
+    else if (diffDays <= 3) return "bg-orange-500";
+    else if (diffDays <= 7) return "bg-yellow-600";
+    else return "bg-green-500";
+};
+
+interface DashboardTask extends Task {
+    rawDate: string;
+}
+
+// Types matching the API requirements
+type FilterType = "All" | "Active" | "Completed";
+type SortType = "toBeCompletedBy" | "created";
 
 export default function TaskDashboard() {
-    const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+    const router = useRouter();
+
+    // --- STATE ---
+    const [tasks, setTasks] = useState<DashboardTask[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // Filter/Sort/Search State
     const [filter, setFilter] = useState<FilterType>("All");
+    const [sortBy, setSortBy] = useState<SortType>("toBeCompletedBy");
     const [searchQuery, setSearchQuery] = useState("");
 
+    // Debounce search so we don't hit API on every keystroke (wait 500ms)
+    const debouncedSearch = useDebounce(searchQuery, 500);
+
+    // Modals
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-
     const [taskToEdit, setTaskToEdit] = useState<TaskData | null>(null);
-    const [taskToDeleteId, setTaskToDeleteId] = useState<number | null>(null);
+    const [taskToDeleteId, setTaskToDeleteId] = useState<string | null>(null);
 
-    const toggleTask = (id: number) => {
-        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t)));
+    // --- API FETCHING ---
+
+    const fetchTasks = async () => {
+        try {
+            setLoading(true);
+
+            // Map UI Filter to API "completed" param
+            let apiCompleted: "yes" | "no" | undefined = undefined;
+            if (filter === "Active") apiCompleted = "no";
+            if (filter === "Completed") apiCompleted = "yes";
+
+            // Call Service with Query Params
+            const apiData = await todoService.getAllTodos({
+                completed: apiCompleted,
+                sortBy: sortBy,
+                search: debouncedSearch,
+            });
+
+            const mappedTasks: DashboardTask[] = apiData.map((item: TodoApiResponse) => ({
+                id: item._id,
+                title: item.title,
+                isCompleted: item.completed,
+                dueDate: formatDate(item.toBeCompletedBy),
+                rawDate: item.toBeCompletedBy,
+                addedDate: formatDate(item.createdAt),
+                priorityColor: getPriorityColor(item.toBeCompletedBy),
+                priority: "Medium",
+            }));
+
+            setTasks(mappedTasks);
+        } catch (error) {
+            console.error("Error fetching tasks:", error);
+            if (error instanceof Error && error.message === "Unauthorized") {
+                router.push("/login");
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleAddTask = (data: { description: string; dueDate: string; isCompleted: boolean }) => {
-        const newTask: Task = {
-            id: Date.now(),
-            title: data.description,
-            isCompleted: data.isCompleted,
-            dueDate: data.dueDate || "No Date",
-            addedDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-            priorityColor: "bg-blue-500",
-        };
-        setTasks((prev) => [newTask, ...prev]);
+    useEffect(() => {
+        fetchTasks();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filter, sortBy, debouncedSearch, router]);
+
+    const toggleTask = async (id: string) => {
+        const task = tasks.find((t) => t.id === id);
+        if (!task) return;
+
+        const newStatus = !task.isCompleted;
+
+        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isCompleted: newStatus } : t)));
+
+        try {
+            await todoService.updateTodo(id, {
+                title: task.title,
+                completed: newStatus,
+                toBeCompletedBy: task.rawDate,
+            });
+        } catch (error) {
+            console.error("Failed to update task status", error);
+            setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isCompleted: !newStatus } : t)));
+        }
+    };
+
+    const handleAddTask = () => {
+        fetchTasks();
         setIsAddModalOpen(false);
     };
 
-    const openEditModal = (task: Task) => {
+    const openEditModal = (task: DashboardTask) => {
         setTaskToEdit({
             id: task.id,
             description: task.title,
             isCompleted: task.isCompleted,
-            dueDate: task.dueDate,
+            dueDate: task.rawDate,
         });
         setIsEditModalOpen(true);
     };
 
-    const handleSaveEditedTask = (updatedData: TaskData) => {
-        setTasks((prev) =>
-            prev.map((t) =>
-                t.id === updatedData.id
-                    ? {
-                          ...t,
-                          title: updatedData.description,
-                          isCompleted: updatedData.isCompleted,
-                          dueDate: updatedData.dueDate,
-                      }
-                    : t
-            )
-        );
+    const handleSaveEditedTask = () => {
+        fetchTasks();
         setIsEditModalOpen(false);
         setTaskToEdit(null);
     };
 
-    const openDeleteModal = (id: number) => {
+    const openDeleteModal = (id: string) => {
         setTaskToDeleteId(id);
         setIsDeleteModalOpen(true);
     };
@@ -121,13 +172,6 @@ export default function TaskDashboard() {
             setTaskToDeleteId(null);
         }
     };
-
-    const filteredTasks = tasks.filter((task) => {
-        if (!task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-        if (filter === "Active") return !task.isCompleted;
-        if (filter === "Completed") return task.isCompleted;
-        return true;
-    });
 
     return (
         <div className="bg-[#f6f7f8] dark:bg-[#101922] min-h-screen w-full font-sans text-[#333333] dark:text-gray-200">
@@ -240,9 +284,13 @@ export default function TaskDashboard() {
                             <div className="flex gap-2 items-center">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">Sort by:</span>
                                 <div className="relative">
-                                    <select className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg py-2 pl-3 pr-8 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 focus:border-[#137fec]/50">
-                                        <option>Due Date</option>
-                                        <option>Creation Date</option>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value as SortType)}
+                                        className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg py-2 pl-3 pr-8 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#137fec]/50 focus:border-[#137fec]/50 cursor-pointer"
+                                    >
+                                        <option value="toBeCompletedBy">Due Date</option>
+                                        <option value="created">Creation Date</option>
                                     </select>
                                     <svg
                                         className="w-5 h-5 text-gray-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -262,8 +310,10 @@ export default function TaskDashboard() {
                         </div>
 
                         <div className="mt-4 px-4 flex flex-col gap-2">
-                            {filteredTasks.length > 0 ? (
-                                filteredTasks.map((task) => (
+                            {loading ? (
+                                <TaskSkeleton />
+                            ) : tasks.length > 0 ? (
+                                tasks.map((task) => (
                                     <div
                                         key={task.id}
                                         className="group flex items-center gap-4 bg-white dark:bg-gray-800/50 p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
@@ -271,8 +321,8 @@ export default function TaskDashboard() {
                                         <input
                                             type="checkbox"
                                             checked={task.isCompleted}
-                                            onChange={() => toggleTask(task.id)}
-                                            className="h-5 w-5 shrink-0 rounded-md border-gray-300 dark:border-gray-600 bg-transparent text-[#137fec] checked:bg-[#137fec] checked:border-[#137fec] focus:ring-2 focus:ring-[#137fec]/50 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900"
+                                            onChange={() => toggleTask(String(task.id))}
+                                            className="h-5 w-5 shrink-0 rounded-md border-gray-300 dark:border-gray-600 bg-transparent text-[#137fec] checked:bg-[#137fec] checked:border-[#137fec] focus:ring-2 focus:ring-[#137fec]/50 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900 cursor-pointer"
                                         />
 
                                         <div className="grow min-w-0">
@@ -299,7 +349,6 @@ export default function TaskDashboard() {
                                             <button
                                                 onClick={() => openEditModal(task)}
                                                 className="p-2 text-gray-500 dark:text-gray-400 hover:text-[#137fec] dark:hover:text-[#137fec] transition-colors focus:outline-none focus:text-[#137fec]"
-                                                aria-label="Edit task"
                                             >
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
@@ -317,9 +366,8 @@ export default function TaskDashboard() {
                                                 </svg>
                                             </button>
                                             <button
-                                                onClick={() => openDeleteModal(task.id)}
+                                                onClick={() => openDeleteModal(String(task.id))}
                                                 className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500 transition-colors focus:outline-none focus:text-red-500"
-                                                aria-label="Delete task"
                                             >
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
@@ -354,27 +402,35 @@ export default function TaskDashboard() {
                                         />
                                     </svg>
                                     <h3 className="mt-4 text-xl font-semibold text-gray-700 dark:text-gray-300">
-                                        {"You're all caught up!"}
+                                        {searchQuery ? "No tasks match your search" : "You're all caught up!"}
                                     </h3>
                                     <p className="mt-2 text-gray-500 dark:text-gray-400">
-                                        Looks like there are no pending tasks. Enjoy your day!
+                                        {searchQuery
+                                            ? "Try a different keyword."
+                                            : "Looks like there are no pending tasks."}
                                     </p>
-                                    <button
-                                        onClick={() => setIsAddModalOpen(true)}
-                                        className="mt-6 flex mx-auto min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#137fec] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#137fec]/90 transition-colors gap-2"
-                                    >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            strokeWidth={2.5}
-                                            stroke="currentColor"
-                                            className="w-5 h-5"
+                                    {!searchQuery && (
+                                        <button
+                                            onClick={() => setIsAddModalOpen(true)}
+                                            className="mt-6 flex mx-auto min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#137fec] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#137fec]/90 transition-colors gap-2"
                                         >
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                        </svg>
-                                        <span className="truncate">Add a New Task</span>
-                                    </button>
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                strokeWidth={2.5}
+                                                stroke="currentColor"
+                                                className="w-5 h-5"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M12 4.5v15m7.5-7.5h-15"
+                                                />
+                                            </svg>
+                                            <span className="truncate">Add a New Task</span>
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -393,12 +449,13 @@ export default function TaskDashboard() {
                     onSave={handleSaveEditedTask}
                     onDelete={(id) => {
                         setIsEditModalOpen(false);
-                        openDeleteModal(Number(id));
+                        openDeleteModal(String(id));
                     }}
                 />
 
                 <DeleteConfirmationModal
                     isOpen={isDeleteModalOpen}
+                    taskId={taskToDeleteId}
                     onClose={() => {
                         setIsDeleteModalOpen(false);
                         setTaskToDeleteId(null);
